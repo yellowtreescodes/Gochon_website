@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Answer Checker</title>
+  <style>
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+    body { background-color: #f4f6f8; margin: 0; padding: 40px 20px; display: flex; justify-content: center; }
+    .card { background: #ffffff; padding: 32px; border-radius: 12px; width: 100%; max-width: 550px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    h1 { margin-top: 0; font-size: 1.5rem; color: #111; text-align: center; margin-bottom: 24px; }
+    .question-block { margin-bottom: 20px; }
+    label { display: block; font-weight: 600; margin-bottom: 8px; color: #333; }
+    input[type="text"] { width: 100%; padding: 10px 12px; font-size: 1rem; border: 1px solid #ccc; border-radius: 6px; outline: none; }
+    input[type="text"]:focus { border-color: #0066cc; }
+    .feedback { margin-top: 6px; font-size: 0.9rem; font-weight: 600; }
+    .feedback.correct { color: #1e7e34; }
+    .feedback.incorrect { color: #d9534f; }
+    button { width: 100%; padding: 12px; font-size: 1rem; font-weight: 600; color: #fff; background-color: #0066cc; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; }
+    button:hover { background-color: #0052a3; }
+    #score { font-size: 1.2rem; font-weight: bold; text-align: center; margin-top: 20px; color: #111; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1 id="quiz-title">Today's Quiz</h1>
+    <form id="quiz-form"></form>
+    <button type="button" onclick="checkAnswers()">Check Answers</button>
+    <div id="score"></div>
+  </div>
+
+  <script>
+    let quizData = [];
+
+    // Load questions automatically from questions.json
+    async function loadQuiz() {
+      try {
+        const response = await fetch('questions.json');
+        quizData = await response.json();
+        const form = document.getElementById('quiz-form');
+        
+        form.innerHTML = quizData.map((q, idx) => `
+          <div class="question-block">
+            <label for="q${idx}">${idx + 1}. ${q.question}</label>
+            <input type="text" id="q${idx}" placeholder="Type your answer..." autocomplete="off">
+            <div class="feedback" id="fb${idx}"></div>
+          </div>
+        `).join('');
+      } catch (err) {
+        document.getElementById('quiz-form').innerHTML = '<p style="color:red">Failed to load questions.json</p>';
+      }
+    }
+
+    function checkAnswers() {
+      let score = 0;
+      quizData.forEach((q, idx) => {
+        const input = document.getElementById(`q${idx}`);
+        const feedback = document.getElementById(`fb${idx}`);
+        const userAns = input.value.trim().toLowerCase();
+        const correctAns = q.answer.toString().trim().toLowerCase();
+
+        if (userAns === correctAns) {
+          feedback.textContent = "✓ Correct";
+          feedback.className = "feedback correct";
+          score++;
+        } else {
+          feedback.textContent = `✗ Incorrect (Correct: ${q.answer})`;
+          feedback.className = "feedback incorrect";
+        }
+      });
+      document.getElementById('score').textContent = `Total Score: ${score} / ${quizData.length}`;
+    }
+
+    loadQuiz();
+  </script>
+
+</body>
+</html>
