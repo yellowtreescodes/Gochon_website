@@ -24,9 +24,9 @@
 <body>
 
   <div class="card">
-    <h1 id="quiz-title">2026-11-11 등교첼린지</h1>
+    <h1 id="quiz-title">2026-11-16 등교첼린지</h1>
     <form id="quiz-form"></form>
-    <button type="button" onclick="checkAnswers()">Check Answers</button>
+    <button type="button" onclick="checkAnswers()">답 확인하기</button>
     <div id="score"></div>
   </div>
 
@@ -65,7 +65,7 @@
           feedback.className = "feedback correct";
           score++;
         } else {
-          feedback.textContent = `✗ Incorrect (Correct: ${q.answer})`;
+          feedback.textContent = `✗ 틀렸습니다 (정답: ${q.answer})`;
           feedback.className = "feedback incorrect";
         }
       });
