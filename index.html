@@ -45,13 +45,64 @@
       border-bottom: none;
     }
 
-    .question-label {
-      display: block;
+    .question-content {
       font-weight: 600;
-      margin-bottom: 10px;
       color: #333;
-      line-height: 1.7;
+      line-height: 2.1;
       white-space: pre-line;
+      word-break: keep-all;
+    }
+
+    .blank-input {
+      display: inline-block;
+      vertical-align: baseline;
+      margin: 0 3px;
+      padding: 3px 6px;
+      font-size: 0.98rem;
+      font-weight: 700;
+      text-align: center;
+      color: #111;
+      background-color: #eef6ff;
+      border: 1.5px solid #93c5fd;
+      border-bottom: 2.5px solid #0066cc;
+      border-radius: 6px;
+      outline: none;
+      transition: border-color 0.15s, background-color 0.15s;
+    }
+
+    .blank-input::placeholder {
+      color: #64748b;
+      font-weight: 500;
+      font-size: 0.82rem;
+    }
+
+    .blank-input:focus {
+      background-color: #fff;
+      border-color: #0066cc;
+      box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15);
+    }
+
+    .blank-input.correct {
+      background-color: #eaf7ed;
+      border-color: #1e7e34;
+      color: #155724;
+    }
+
+    .blank-input.incorrect {
+      background-color: #fdf2f2;
+      border-color: #d9534f;
+      color: #a94442;
+    }
+
+    .inline-correction {
+      display: inline-block;
+      margin: 0 4px 0 1px;
+      padding: 1px 6px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #1e7e34;
+      background-color: #eaf7ed;
+      border-radius: 4px;
     }
 
     .provided-image {
@@ -64,21 +115,8 @@
       object-fit: contain;
     }
 
-    input[type="text"] {
-      width: 100%;
-      padding: 11px 12px;
-      font-size: 1rem;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      outline: none;
-    }
-
-    input[type="text"]:focus {
-      border-color: #0066cc;
-    }
-
     .feedback {
-      margin-top: 8px;
+      margin-top: 10px;
       font-size: 0.92rem;
       font-weight: 600;
     }
@@ -163,18 +201,39 @@
   <script>
     let quizData = [];
 
+    function calculateBlankWidth(answerText) {
+      let units = 0;
+      for (const ch of answerText) {
+        // CJK / Hangul characters take roughly 1.85ch, Latin/digits take ~1.05ch
+        units += /[\u3131-\uD79D\u4E00-\u9FFF\u3040-\u30FF]/.test(ch) ? 1.85 : 1.05;
+      }
+      return `${Math.max(units + 2.4, 5.4).toFixed(1)}ch`;
+    }
+
+    function createBlankInput(answerText, questionIdx, blankIdx) {
+      const charCount = answerText.length;
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "blank-input";
+      input.id = `q${questionIdx}_b${blankIdx}`;
+      input.dataset.answer = answerText;
+      input.placeholder = `${charCount}글자`;
+      input.autocomplete = "off";
+      input.style.width = calculateBlankWidth(answerText);
+      input.setAttribute("aria-label", `${questionIdx + 1}번 문제 ${blankIdx + 1}번째 빈칸 (${charCount}글자)`);
+      return input;
+    }
+
     async function loadQuiz() {
       const form = document.getElementById("quiz-form");
 
       try {
         const response = await fetch("questions.json");
-
         if (!response.ok) {
           throw new Error(`HTTP error: ${response.status}`);
         }
 
         quizData = await response.json();
-
         if (!Array.isArray(quizData)) {
           throw new Error("questions.json must contain an array.");
         }
@@ -185,14 +244,32 @@
           const block = document.createElement("section");
           block.className = "question-block";
 
-          const label = document.createElement("label");
-          label.className = "question-label";
-          label.htmlFor = `q${idx}`;
-          label.textContent = `${idx + 1}. ${q.question ?? ""}`;
-          block.appendChild(label);
+          const content = document.createElement("div");
+          content.className = "question-content";
 
-          // Display an image stored in the GitHub repository.
-          // Example in questions.json: "image": "image.png"
+          const rawQuestion = `${idx + 1}. ${q.question ?? ""}`;
+          // Split text into normal text and *blanked* segments
+          const parts = rawQuestion.split(/(\*[^*\n]+\*)/g);
+          let blankCount = 0;
+
+          parts.forEach((part) => {
+            if (part.startsWith("*") && part.endsWith("*") && part.length > 2) {
+              const hiddenWord = part.slice(1, -1);
+              const input = createBlankInput(hiddenWord, idx, blankCount++);
+              content.appendChild(input);
+            } else if (part) {
+              content.appendChild(document.createTextNode(part));
+            }
+          });
+
+          // Fallback if a question has no *...* markers but provides a separate "answer" field
+          if (blankCount === 0 && q.answer !== undefined) {
+            content.appendChild(document.createTextNode(" "));
+            content.appendChild(createBlankInput(String(q.answer), idx, 0));
+          }
+
+          block.appendChild(content);
+
           if (q.image) {
             const img = document.createElement("img");
             img.className = "provided-image";
@@ -208,20 +285,12 @@
             block.appendChild(img);
           }
 
-          const answerInput = document.createElement("input");
-          answerInput.type = "text";
-          answerInput.id = `q${idx}`;
-          answerInput.placeholder = "Type your answer...";
-          answerInput.autocomplete = "off";
-          block.appendChild(answerInput);
-
           const feedback = document.createElement("div");
           feedback.className = "feedback";
           feedback.id = `fb${idx}`;
           feedback.setAttribute("aria-live", "polite");
           block.appendChild(feedback);
 
-          // Explanations stay hidden until the answer button is clicked.
           if (q.explanation) {
             const explanation = document.createElement("div");
             explanation.className = "explanation";
@@ -240,7 +309,6 @@
 
           form.appendChild(block);
         });
-
       } catch (error) {
         console.error(error);
         form.textContent =
@@ -254,22 +322,48 @@
         return;
       }
 
-      let score = 0;
+      // Clear previous inline answer badges if user re-checks
+      document.querySelectorAll(".inline-correction").forEach((el) => el.remove());
 
-      quizData.forEach((q, idx) => {
-        const input = document.getElementById(`q${idx}`);
+      let totalBlanks = 0;
+      let correctBlanks = 0;
+
+      const blocks = document.querySelectorAll(".question-block");
+
+      blocks.forEach((block, idx) => {
+        const inputs = block.querySelectorAll(".blank-input");
         const feedback = document.getElementById(`fb${idx}`);
+        let questionCorrectCount = 0;
 
-        const userAnswer = input.value.trim().toLowerCase();
-        const correctAnswer = String(q.answer ?? "").trim().toLowerCase();
+        inputs.forEach((input) => {
+          totalBlanks++;
+          const userAnswer = input.value.trim().toLowerCase();
+          const expectedRaw = input.dataset.answer ?? "";
+          const expectedNormalized = expectedRaw.trim().toLowerCase();
 
-        if (userAnswer !== "" && userAnswer === correctAnswer) {
-          feedback.textContent = "✓ Correct";
-          feedback.className = "feedback correct";
-          score++;
-        } else {
-          feedback.textContent = `✗ 틀렸습니다 (정답: ${q.answer ?? ""})`;
-          feedback.className = "feedback incorrect";
+          input.classList.remove("correct", "incorrect");
+
+          if (userAnswer !== "" && userAnswer === expectedNormalized) {
+            input.classList.add("correct");
+            correctBlanks++;
+            questionCorrectCount++;
+          } else {
+            input.classList.add("incorrect");
+            const badge = document.createElement("span");
+            badge.className = "inline-correction";
+            badge.textContent = `→ ${expectedRaw}`;
+            input.insertAdjacentElement("afterend", badge);
+          }
+        });
+
+        if (inputs.length > 0) {
+          if (questionCorrectCount === inputs.length) {
+            feedback.textContent = `✓ 정답입니다 (${questionCorrectCount}/${inputs.length})`;
+            feedback.className = "feedback correct";
+          } else {
+            feedback.textContent = `✗ 오답이 있습니다 (${questionCorrectCount}/${inputs.length} 맞음)`;
+            feedback.className = "feedback incorrect";
+          }
         }
 
         const explanation = document.getElementById(`ex${idx}`);
@@ -279,11 +373,15 @@
       });
 
       document.getElementById("score").textContent =
-        `Total Score: ${score} / ${quizData.length}`;
+        `Total Score: ${correctBlanks} / ${totalBlanks}`;
     }
 
-    document.getElementById("check-button")
-      .addEventListener("click", checkAnswers);
+    document.getElementById("quiz-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      checkAnswers();
+    });
+
+    document.getElementById("check-button").addEventListener("click", checkAnswers);
 
     loadQuiz();
   </script>
