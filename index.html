@@ -106,6 +106,7 @@
       border: 1px solid #d1d5db;
       border-radius: 8px;
       font-size: 1rem;
+      font-weight: 600;
       cursor: pointer;
     }
 
@@ -151,360 +152,38 @@
       border-bottom: none;
     }
 
-    .question-label {
-      display: block;
+    .question-content {
       font-weight: 600;
-      margin-bottom: 10px;
       color: #333;
-      line-height: 1.7;
+      line-height: 2.1;
       white-space: pre-line;
+      word-break: keep-all;
     }
 
-    .provided-image {
-      display: block;
-      width: 100%;
-      height: auto;
-      max-height: 480px;
-      margin: 12px auto 16px;
-      border-radius: 8px;
-      object-fit: contain;
-    }
-
-    input[type="text"] {
-      width: 100%;
-      padding: 11px 12px;
-      font-size: 1rem;
-      border: 1px solid #ccc;
+    .blank-input {
+      display: inline-block;
+      vertical-align: baseline;
+      margin: 0 3px;
+      padding: 3px 6px;
+      font-size: 0.98rem;
+      font-weight: 700;
+      text-align: center;
+      color: #111;
+      background-color: #eef6ff;
+      border: 1.5px solid #93c5fd;
+      border-bottom: 2.5px solid #0066cc;
       border-radius: 6px;
       outline: none;
+      transition: border-color 0.15s, background-color 0.15s;
     }
 
-    input[type="text"]:focus {
+    .blank-input::placeholder {
+      color: #64748b;
+      font-weight: 500;
+      font-size: 0.82rem;
+    }
+
+    .blank-input:focus {
+      background-color: #fff;
       border-color: #0066cc;
-    }
-
-    .feedback {
-      margin-top: 8px;
-      font-size: 0.92rem;
-      font-weight: 600;
-    }
-
-    .feedback.correct {
-      color: #1e7e34;
-    }
-
-    .feedback.incorrect {
-      color: #d9534f;
-    }
-
-    .explanation {
-      display: none;
-      margin-top: 16px;
-      padding: 18px;
-      background: #f4f6f8;
-      border-radius: 8px;
-      border-left: 4px solid #0066cc;
-      color: #333;
-      line-height: 1.75;
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
-    }
-
-    .explanation h3 {
-      margin: 0 0 10px;
-      font-size: 1.08rem;
-      color: #111;
-    }
-
-    .explanation p {
-      margin: 0;
-      font-size: 0.95rem;
-    }
-
-    .submit-btn {
-      width: 100%;
-      padding: 13px;
-      font-size: 1rem;
-      font-weight: 600;
-      color: #fff;
-      background: #0066cc;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      margin-top: 10px;
-    }
-
-    .submit-btn:hover {
-      background: #0052a3;
-    }
-
-    #score {
-      font-size: 1.2rem;
-      font-weight: bold;
-      text-align: center;
-      margin-top: 20px;
-      color: #111;
-    }
-
-    @media (max-width: 768px) {
-      .sidebar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        bottom: 0;
-        transform: translateX(-100%);
-      }
-
-      .sidebar.open {
-        transform: translateX(0);
-      }
-
-      .mobile-topbar {
-        display: flex;
-      }
-
-      .main-wrapper {
-        padding: 16px 12px 32px;
-      }
-
-      .card {
-        padding: 22px 18px;
-      }
-    }
-  </style>
-</head>
-
-<body>
-  <div class="overlay" id="overlay"></div>
-
-  <aside class="sidebar" id="sidebar" aria-label="등교첼린지 목록">
-    <div class="sidebar-header">등교첼린지 기록</div>
-    <ul class="quiz-list" id="quiz-list"></ul>
-  </aside>
-
-  <div class="main-wrapper">
-    <div class="mobile-topbar">
-      <button type="button" class="menu-toggle" id="menu-toggle" aria-label="목록 열기">
-        ☰ 이전 챌린지 보기
-      </button>
-    </div>
-
-    <main class="card">
-      <h1 id="quiz-title">불러오는 중...</h1>
-      <form id="quiz-form"></form>
-      <button type="button" class="submit-btn" id="check-button">답 확인하기</button>
-      <div id="score" aria-live="polite"></div>
-    </main>
-  </div>
-
-  <script>
-    let quizManifest = [];
-    let quizData = [];
-    let currentQuizId = null;
-
-    const sidebar = document.getElementById("sidebar");
-    const overlay = document.getElementById("overlay");
-    const menuToggle = document.getElementById("menu-toggle");
-
-    function closeMobileSidebar() {
-      sidebar.classList.remove("open");
-      overlay.classList.remove("show");
-    }
-
-    menuToggle.addEventListener("click", () => {
-      sidebar.classList.toggle("open");
-      overlay.classList.toggle("show");
-    });
-
-    overlay.addEventListener("click", closeMobileSidebar);
-
-    async function initApp() {
-      const listEl = document.getElementById("quiz-list");
-      const form = document.getElementById("quiz-form");
-
-      try {
-        const res = await fetch("quizzes.json");
-        if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
-
-        quizManifest = await res.json();
-        if (!Array.isArray(quizManifest) || quizManifest.length === 0) {
-          throw new Error("quizzes.json에 등록된 퀴즈가 없습니다.");
-        }
-
-        renderSidebar();
-
-        // Check URL parameter (?quiz=2026-11-17) or default to the first item
-        const params = new URLSearchParams(window.location.search);
-        const requestedId = params.get("quiz");
-        const initialQuiz =
-          quizManifest.find((item) => item.id === requestedId) || quizManifest[0];
-
-        await loadQuiz(initialQuiz);
-      } catch (error) {
-        console.error(error);
-        document.getElementById("quiz-title").textContent = "오류 발생";
-        form.textContent =
-          "quizzes.json을 불러오지 못했습니다. 파일 위치와 JSON 형식을 확인해 주세요.";
-        listEl.innerHTML = "";
-      }
-    }
-
-    function renderSidebar() {
-      const listEl = document.getElementById("quiz-list");
-      listEl.replaceChildren();
-
-      quizManifest.forEach((item) => {
-        const li = document.createElement("li");
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "quiz-item-btn";
-        btn.dataset.id = item.id;
-        btn.textContent = item.title;
-
-        btn.addEventListener("click", () => {
-          loadQuiz(item);
-          closeMobileSidebar();
-        });
-
-        li.appendChild(btn);
-        listEl.appendChild(li);
-      });
-    }
-
-    function updateActiveSidebarItem(id) {
-      document.querySelectorAll(".quiz-item-btn").forEach((btn) => {
-        btn.classList.toggle("active", btn.dataset.id === id);
-      });
-    }
-
-    async function loadQuiz(quizMeta) {
-      const form = document.getElementById("quiz-form");
-      const titleEl = document.getElementById("quiz-title");
-      const scoreEl = document.getElementById("score");
-
-      currentQuizId = quizMeta.id;
-      titleEl.textContent = quizMeta.title;
-      scoreEl.textContent = "";
-      updateActiveSidebarItem(quizMeta.id);
-
-      // Update URL without reloading page so links are shareable
-      const url = new URL(window.location);
-      url.searchParams.set("quiz", quizMeta.id);
-      window.history.replaceState({}, "", url);
-
-      try {
-        const response = await fetch(quizMeta.file);
-        if (!response.ok) {
-          throw new Error(`HTTP error: ${response.status}`);
-        }
-
-        quizData = await response.json();
-        if (!Array.isArray(quizData)) {
-          throw new Error("Quiz JSON must contain an array.");
-        }
-
-        form.replaceChildren();
-
-        quizData.forEach((q, idx) => {
-          const block = document.createElement("section");
-          block.className = "question-block";
-
-          const label = document.createElement("label");
-          label.className = "question-label";
-          label.htmlFor = `q${idx}`;
-          label.textContent = `${idx + 1}. ${q.question ?? ""}`;
-          block.appendChild(label);
-
-          if (q.image) {
-            const img = document.createElement("img");
-            img.className = "provided-image";
-            img.src = q.image;
-            img.alt = `Question ${idx + 1} image`;
-
-            img.onerror = () => {
-              img.alt = "이미지를 불러오지 못했습니다. JSON의 이미지 경로를 확인해 주세요.";
-              img.style.display = "none";
-              console.error(`Could not load image: ${q.image}`);
-            };
-
-            block.appendChild(img);
-          }
-
-          const answerInput = document.createElement("input");
-          answerInput.type = "text";
-          answerInput.id = `q${idx}`;
-          answerInput.placeholder = "Type your answer...";
-          answerInput.autocomplete = "off";
-          block.appendChild(answerInput);
-
-          const feedback = document.createElement("div");
-          feedback.className = "feedback";
-          feedback.id = `fb${idx}`;
-          feedback.setAttribute("aria-live", "polite");
-          block.appendChild(feedback);
-
-          if (q.explanation) {
-            const explanation = document.createElement("div");
-            explanation.className = "explanation";
-            explanation.id = `ex${idx}`;
-
-            const heading = document.createElement("h3");
-            heading.textContent = "해설";
-
-            const explanationText = document.createElement("p");
-            explanationText.textContent = q.explanation;
-
-            explanation.appendChild(heading);
-            explanation.appendChild(explanationText);
-            block.appendChild(explanation);
-          }
-
-          form.appendChild(block);
-        });
-      } catch (error) {
-        console.error(error);
-        quizData = [];
-        form.textContent = `${quizMeta.file} 파일을 불러오지 못했습니다. 파일 위치와 JSON 형식을 확인해 주세요.`;
-      }
-    }
-
-    function checkAnswers() {
-      if (quizData.length === 0) {
-        alert("불러온 문제가 없습니다.");
-        return;
-      }
-
-      let score = 0;
-
-      quizData.forEach((q, idx) => {
-        const input = document.getElementById(`q${idx}`);
-        const feedback = document.getElementById(`fb${idx}`);
-
-        const userAnswer = input.value.trim().toLowerCase();
-        const correctAnswer = String(q.answer ?? "").trim().toLowerCase();
-
-        if (userAnswer !== "" && userAnswer === correctAnswer) {
-          feedback.textContent = "✓ Correct";
-          feedback.className = "feedback correct";
-          score++;
-        } else {
-          feedback.textContent = `✗ 틀렸습니다 (정답: ${q.answer ?? ""})`;
-          feedback.className = "feedback incorrect";
-        }
-
-        const explanation = document.getElementById(`ex${idx}`);
-        if (explanation) {
-          explanation.style.display = "block";
-        }
-      });
-
-      document.getElementById("score").textContent =
-        `Total Score: ${score} / ${quizData.length}`;
-    }
-
-    document.getElementById("check-button").addEventListener("click", checkAnswers);
-
-    initApp();
-  </script>
-</body>
-</html>
+      box-shadow: 0 0 0 3px rgba(0, 1
